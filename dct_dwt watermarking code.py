@@ -8,7 +8,7 @@ from scipy.fftpack import idct
 current_path = str(os.path.dirname(__file__))
 
 image = 'image.png'
-watermark = 'watermark.png'
+watermark = 'watermark2.png'
 
 def convert_image(image_name, size):
     with open('log/function_calls.txt', 'a') as logfile:
@@ -37,23 +37,23 @@ def process_coefficients(imArray, model, level):
     return coeffs_H
 
 
-def embed_mod2(coeff_image, coeff_watermark, offset=0):
-    with open('./log/function_calls.txt', 'a') as logfile:
-        logfile.write('embed_mod2\n')
-    for i in xrange(coeff_watermark.__len__()):
-        for j in xrange(coeff_watermark[i].__len__()):
-            coeff_image[i*2+offset][j*2+offset] = coeff_watermark[i][j]
-
-    return coeff_image
-
-def embed_mod4(coeff_image, coeff_watermark):
-    with open('./log/function_calls.txt', 'a') as logfile:
-        logfile.write('embed_mod4\n')
-    for i in xrange(coeff_watermark.__len__()):
-        for j in xrange(coeff_watermark[i].__len__()):
-            coeff_image[i*4][j*4] = coeff_watermark[i][j]
-
-    return coeff_image
+# def embed_mod2(coeff_image, coeff_watermark, offset=0):
+#     with open('./log/function_calls.txt', 'a') as logfile:
+#         logfile.write('embed_mod2\n')
+#     for i in xrange(coeff_watermark.__len__()):
+#         for j in xrange(coeff_watermark[i].__len__()):
+#             coeff_image[i*2+offset][j*2+offset] = coeff_watermark[i][j]
+#
+#     return coeff_image
+#
+# def embed_mod4(coeff_image, coeff_watermark):
+#     with open('./log/function_calls.txt', 'a') as logfile:
+#         logfile.write('embed_mod4\n')
+#     for i in xrange(coeff_watermark.__len__()):
+#         for j in xrange(coeff_watermark[i].__len__()):
+#             coeff_image[i*4][j*4] = coeff_watermark[i][j]
+#
+#     return coeff_image
 
 
 
@@ -149,9 +149,9 @@ def print_image_from_array(image_array, name):
 
 
 
-def w2d(img):
+def watermarker():
     with open('./log/function_calls.txt', 'a') as logfile:
-        logfile.write('w2d\n')
+        logfile.write('watermarker\n')
     wavelet_type = 'haar'
     level = 1
     image_array = convert_image(image, 2048) # return grayscale of size 2048*2048
@@ -164,11 +164,11 @@ def w2d(img):
 
 
 # reconstruction
-    image_array_H=pywt.waverec2(coeffs_image, model)
+    image_array_H=pywt.waverec2(coeffs_image, wavelet_type)
     print_image_from_array(image_array_H, 'image_with_watermark.jpg')
 
 # recover images
-    recover_watermark(image_array = image_array_H, model=model, level = level)
+    recover_watermark(image_array = image_array_H, model=wavelet_type, level = level)
 
 
-w2d("test")
+watermarker()
