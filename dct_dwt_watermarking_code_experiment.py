@@ -27,32 +27,32 @@ def convert_image(image_name, size):
 
     return image_array
 
-def process_coefficients(imArray, model, level):
+def apply_dwt(imArray, model, level):
     with open('./log/function_calls.txt', 'a') as logfile:
-        logfile.write('process_coefficients\n')
-    coeffs=pywt.wavedec2(data = imArray, wavelet = model, level = level)
+        logfile.write('apply_dwt\n')
+    dwt_coefficients=pywt.wavedec2(data = imArray, wavelet = model, level = level)
     # print(coeffs[0].__len__())
-    coeffs_H=list(coeffs)
 
-    return coeffs_H
+    return dwt_coefficients
 
-def embed_watermark(watermark_array, orig_image):
+
+
+def embed_watermark(watermark_array, transformed_image):
     with open('./log/function_calls.txt', 'a') as logfile:
         logfile.write('embed_watermark\n')
     watermark_array_size = watermark_array[0].__len__()
     watermark_flat = watermark_array.ravel()
     ind = 0
 
-    for x in range (0, orig_image.__len__(), 8):
-        for y in range (0, orig_image.__len__(), 8):
+    for x in range (0, transformed_image.__len__(), 8):
+        for y in range (0, transformed_image.__len__(), 8):
             if ind < watermark_flat.__len__():
-                subdct = orig_image[x:x+8, y:y+8]
+                subdct = transformed_image[x:x+8, y:y+8]
                 subdct[5][5] = watermark_flat[ind]
-                orig_image[x:x+8, y:y+8] = subdct
+                transformed_image[x:x+8, y:y+8] = subdct
                 ind += 1
 
-
-    return orig_image
+    return transformed_image
 
 
 
@@ -60,36 +60,32 @@ def apply_dct(image_array):
     with open('./log/function_calls.txt', 'a') as logfile:
         logfile.write('apply_dct\n')
     size = image_array[0].__len__()
-    all_subdct = np.empty((size, size))
+    dct_coefficients = np.empty((size, size))
+    for i in range (0, size, 8):
+        for j in range (0, size, 8):
+            subpixels = image_array[i:i+8, j:j+8]
+            subdct = dct(dct(subpixels.T, norm="ortho").T, norm="ortho")
+            dct_coefficients[i:i+8, j:j+8] = subdct
 
-    all_subdct = dct(image_array.T, norm='ortho')
-
-    return all_subdct
-    # for i in range (0, size, 8):
-    #     for j in range (0, size, 8):
-    #         subpixels = image_array[i:i+8, j:j+8]
-    #         subdct = dct(dct(subpixels.T, norm="ortho").T, norm="ortho")
-    #         all_subdct[i:i+8, j:j+8] = subdct
-    #
-    # return all_subdct
+    return dct_coefficients
 
 
-def inverse_dct(all_subdct):
+def inverse_dct(dct_image):
     with open('./log/function_calls.txt', 'a') as logfile:
         logfile.write('inverse_dct\n')
-    size = all_subdct[0].__len__()
-    all_subidct = np.empty((size, size))
+    size = dct_image[0].__len__()
+    idct_image = np.empty((size, size))
+    for i in range (0, size, 8):
+        for j in range (0, size, 8):
+            subidct = idct(idct(dct_image[i:i+8, j:j+8].T, norm="ortho").T, norm="ortho")
+            idct_image[i:i+8, j:j+8] = subidct
 
-    all_subidct = idct(all_subdct.T, norm='ortho')
-    # for i in range (0, size, 8):
-    #     for j in range (0, size, 8):
-    #         subidct = idct(idct(all_subdct[i:i+8, j:j+8].T, norm="ortho").T, norm="ortho")
-    #         all_subidct[i:i+8, j:j+8] = subidct
-
-    return all_subidct
+    return idct_image
 
 
 def get_watermark(dct_watermarked_coeff, watermark_size):
+
+    # print("kya", dct_watermarked_coeff.shape)
 
     with open('./log/function_calls.txt', 'a') as logfile:
         logfile.write('get_watermark\n')
@@ -110,10 +106,11 @@ def recover_watermark(image_array, model='haar', level = 1):
     with open('./log/function_calls.txt', 'a') as logfile:
         logfile.write('recover_watermark\n')
 
-    coeffs_watermarked_image = process_coefficients(image_array, model, level=level)
-    dct_watermarked_coeff = apply_dct(coeffs_watermarked_image[0])
+    coeffs_watermarked_image = apply_dwt(image_array, model, level=level)
+    coeffs_watermarked_image2 = apply_dwt(coeffs_watermarked_image[0], model, level=level)
+    dct_watermarked_coeff = apply_dct(coeffs_watermarked_image2[0])
 
-    watermark_array = get_watermark(dct_watermarked_coeff, 128)
+    watermark_array = get_watermark(dct_watermarked_coeff, 64)
 
     watermark_array =  np.uint8(watermark_array)
 
@@ -135,25 +132,31 @@ def print_image_from_array(image_array, name):
 
 
 def watermarker():
-    with open('./log/function_calls.txt', 'a') as logfile:
+    with open('./log/function_calls.txt', 'w') as logfile:
         logfile.write('watermarker\n')
     wavelet_type = 'haar'
     level = 1
     image_array = convert_image(image, 2048) # return grayscale of size 2048*2048
-    watermark_array = convert_image(watermark, 128) # return grayscale of size 128*128
+    watermark_array = convert_image(watermark, 64) # return grayscale of size 64*64
 
-    coeffs_image = process_coefficients(image_array, wavelet_type, level=level)
-    dct_array = apply_dct(coeffs_image[0]) # returns dct of entire image
-    dct_array = embed_watermark(watermark_array, dct_array)
-    coeffs_image[0] = inverse_dct(dct_array)
+    dwt_image = apply_dwt(image_array, wavelet_type, level=level)
+    dwt_image2 = apply_dwt(dwt_image[0],wavelet_type, level=level)
+    dct_image = apply_dct(dwt_image2[0]) # returns dct of entire image
+    # print("bhag", len(dwt_image2[0]))
+    dct_image = embed_watermark(watermark_array, dct_image)
+    dwt_image2[0] = inverse_dct(dct_image)
 
 
-# reconstruction
-    image_array_H=pywt.waverec2(coeffs_image, wavelet_type)
-    print_image_from_array(image_array_H, 'image_with_watermark.jpg')
+# construct the watermarked image
+    idwt_image2 = pywt.waverec2(dwt_image2, wavelet_type)
+    dwt_image[0] = idwt_image2
+    idwt_image = pywt.waverec2(dwt_image, wavelet_type)
+    print_image_from_array(idwt_image, 'image_with_watermark.jpg')
 
 # recover images
-    recover_watermark(image_array = image_array_H, model=wavelet_type, level = level)
+    # print("bhai", idwt_image.shape)
+    recover_watermark(image_array = idwt_image, model=wavelet_type, level = level)
 
 
-watermarker()
+if __name__ == '__main__':
+    watermarker()
